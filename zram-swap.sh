@@ -40,6 +40,9 @@ fi
 
 # main script:
 _main() {
+
+sleep 20
+
   if ! modprobe zram; then
     err "main: Failed to load zram module, exiting"
     return 1
