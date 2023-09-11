@@ -10,6 +10,7 @@ ExecStart=/usr/local/sbin/zram-swap.sh start
 ExecStop=/usr/local/sbin/zram-swap.sh stop
 RemainAfterExit=true
 RestartSec=2
+Restart=on-failure
 
 [Install]
 WantedBy=sysinit.target
