@@ -2,35 +2,55 @@
 # source: https://github.com/foundObjects/zram-swap
 # shellcheck disable=SC2039,SC2162
 
-#[ "$(id -u)" -eq '0' ] || { echo "This script requires root." && exit 1; }
 case "$(readlink /proc/$$/exe)" in */bash) set -euo pipefail ;; *) set -eu ;; esac
 
-# ensure a predictable environment
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 \unalias -a
 
-# installer main body:
 _main() {
-  # ensure $1 exists so 'set -u' doesn't error out
   { [ "$#" -eq "0" ] && set -- ""; } > /dev/null 2>&1
 
   case "$1" in
     "--uninstall")
-      # uninstall, requires root
       assert_root
       _uninstall
       ;;
     "--install" | "")
-      # install dpkg hooks, requires root
       assert_root
+      _check_zram
       _install "$@"
       ;;
     *)
-      # unknown flags, print usage and exit
       _usage
       ;;
   esac
   exit 0
+}
+
+_check_zram() {
+  echo "Checking zram kernel module availability ..."
+
+  # already loaded or built-in
+  if [ -b /dev/zram0 ] || grep -q '^zram ' /proc/modules; then
+    echo "zram module already active."
+    return 0
+  fi
+
+  # try loading it
+  if ! modprobe zram 2>&1; then
+    cat >&2 <<-EOF
+	Error: failed to load the zram kernel module.
+
+	Possible causes:
+	  - Your kernel was built without zram support (CONFIG_ZRAM)
+	  - You are on a VPS/container with a restricted kernel
+
+	Check with: modinfo zram
+	EOF
+    exit 1
+  fi
+
+  echo "zram module loaded successfully."
 }
 
 _install() {
@@ -88,12 +108,12 @@ _install() {
   systemctl enable zram-swap.service
 
   if [ -n "$newconfig" ]; then
-    cat <<- HEREDOC
-		Configuration file updated; old config saved as /etc/default/zram-swap.oldconfig
+    cat <<-HEREDOC
+	Configuration file updated; old config saved as /etc/default/zram-swap.oldconfig
 
-		Please review changes between configurations and then start the service with
-		systemctl start zram-swap.service
-		HEREDOC
+	Please review changes between configurations and then start the service with
+	systemctl start zram-swap.service
+	HEREDOC
   else
     echo "Starting zram-swap service ..."
     systemctl start zram-swap.service
